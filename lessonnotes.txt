@@ -1,0 +1,78 @@
+Kubernetes Lesson Notes
+
+Part 1 Main Kubernetes Components:
+
+* Pod - Contains Containers, which have your apps running inside them, (maybe DB too, in a seperate container). Usually one main application per Pod.
+So one applicaiton, one db maybe, in one pod. Each pod gets it's OWN IP address, NOT THE CONTAINER. Each pod can communicate with each other through these 
+virtual IPs. Pods can DIE very easily...that's okay. If the pod dies, a new one will get created in it's place...which will get assigned a new IP address.
+Because pods live and die all the time, you need to connect DBs to them through a 'Service'.
+
+* Service is a permanant IP address that can be attached to each pod. Even if the Pod dies, the Service and it's IP address will stay. 
+It is also a Load Balancer which sends request to different avaliable Nodes/Pods.
+
+*External Service - An external service exposes the app to external sources,(like the web, for example). You'db
+want your URL to look like THIS, for production: https://my-app.com. An IP Address is good for testing tho
+
+*Internal Service - A service exposed INTERNALLY to communicate within your app, (like for DBs which you shouldn't be exposing 
+trhough the web).
+
+* Ingress - For an app name that would be in contact with the External service, you would create an 'Ingress'. The request STARTS
+at the Ingress, then gets transferred as need be to a service.
+
+Setup/Configuration.
+
+*Database URL is usually put into the build applicaiton. This would have to be rebuilt int docker and pushed to a hub or somewhere.
+
+*Kubernetes has a tool called ConfigMap, which handles external configuration of your application. COntains config data like URL of database, for example.
+You would just need to connect it to a pod. That way, you don't have to build a new image, just change the ConfigMap.
+DON'T PUT CREDENTIALS INTO CONFIGMAP. PUT IT IN SECRET.
+
+* Secret is like configmap but for secret credentials like passwords. IT's base64 encoded. Warning, it's not enabled by default!
+
+* Volumes - attaches a physical hard drive storage to your pod,(ideally to store DB information). Could be local or remote.
+Think of it as an external hard drive into the K8 cluster. K8 does NOT manage data persistance.
+
+* Node - A server connected to services with a managed IP. These contain pods that run our application/DB.
+Each node has multipe pods on them.
+
+* Deployment - A Blueprint for 'MyApp' pods. (Actually, this is an abstraction ON TOP of the Pods).
+These will be managed to have a set amount active/deployed at one time.
+In practice, you don't work with Pods...you work with deployments. You can scale the amount of replicas up and down.
+DB cannot be replicated in a deployment...because DB have a state. For that, you need a 'StatefulSet''
+
+* StatefulSet - Used for applications like DBs, (MySQL, etc.). Used for persistant data and scaling, making 
+sure the DB reads/writes are syncrhonized. These deployments are somewhat tedious. That's why
+DB are reccommended to be hosted OUTSIDE of the Kubernets cluster.
+
+
+Part 2 K8 Architechture
+
+* 3 processes must be installed on every node.
+Container runtime, (like docker). 
+
+Kubelet, which is a kubernetes process that interfaces with the running containers AND the node.
+Kubelet actually manages starting the pod with a container inside.
+
+Kube Proxy forwards the requests from services to the pods. For instance, it will take a request from the app
+on the SAME pod, and forward it to a DB on the SAME pod.
+
+* Master Nodes - Manage all the Application Nodes beneath them. Must have 4 processes running:
+
+API Server - Like a Cluster Gateway of any updates into the cluster or queries intot he cluster. Acts as a gatekeeper for 
+authentication. You have to talk to the API server on the master node. It validates your request, then forwards it to other processes,
+(for creating a pod or whatever, or querying the health of your cluster). Good cuz you only have 1 entrypoint.
+
+Scheduler - Schedules new pods inside the worker nodes. It also knows WHERE to put the pods, in terms of resources.  Kubelet is the actually 
+thing that starts it.
+
+Controller Manager - Detects when nodes die,(state changes in genearl). Makes a request to the scheduler to do that.
+
+etcd - A Key value store of a cluster state...the cluster brain. If things change in the cluster, it gets stored/logged. For example, scheduler and 
+api server use the information stored in here to perform actions. Applicaiton data is NOT stored in here, just for the master node processes data to work.
+
+Master nodes are usually duplicated to control all of this.
+
+Example Cluster setup: 2 Master Nodes, 3 work nodes.
+Master nodes need less resources, worker nodes need more.Nodes can scale horizationtally as needed.
+
+Part 3 Minkube Setup
