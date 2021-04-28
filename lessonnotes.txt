@@ -96,9 +96,11 @@ minikube start --vm-driver=hyperkit
 For Docker: minikube start --driver=docker
 Make Docker the Default Driver: minikube config set driver docker
 
+* Note, you'll need to do this every time your host machine shuts down.
+
 Some commands: 
 kubectl get nodes = gets all your nodes.
-minikube status = gets teh status of your minikube
+minikube status = gets the status of your minikube
 kubectl version = latest version of kubernetes installed
 
 
@@ -209,3 +211,112 @@ kubectl delete -f nginx-service.yaml
 
 Part 6 Complete Demo Project
 What's it look like: Internal Service, an External Service, Secrets for DB Username and Password, A URL we can reach through enviornment variables too.
+Request flow looks like: Request from browser ==> MongoExpress/External-Service ==> Mongo Express Pod ==> MongoDB Internal service ==> MongoDB Pod,(Setup using Secret login creds)
+
+For a lot of this, we're writing notes in the configuration files. TBH, kind need to see some port information on the Docker site hosting the container(s)
+In the MongoDB container, they've set enviornment variables for the username,(MONGO_INITDB_ROOT_USERNAME), and the password,(MONGO_INITDB_ROOTPASSWORD)
+
+Creating base 64 encrypte passwords for mongo-secret.yaml:
+ehco -n 'username'  | base64
+           your username   what type of encoding
+
+Note, creation of components matter...you can't reference secrets if they aren't created first!
+
+Secret created: kubectl apply -f mongo-secret.yaml
+Then, after secret created and we fixed our mongo config file: kubectl apply -f mongo.yaml
+
+In YAML, you can create multiple 'documents' in one file
+In yaml, this, ( --- ) is key for, "New Document)", seen in mongo.yaml
+Deployments and Services usually go in one file because they usually go 
+together
+
+After creating service, see that it's working:
+kubectl get service
+AND validate it's connected to the pods:
+kubectl describe service mongodb-service
+Find all components related to Mongo with Grep:
+kubectl get all | grep mongodb
+
+Mongo express creation:
+If you have two apps that are using the SAME CREDENTAILS, it might be
+smart to create a config map to store that as a centralized 
+credentials space for all the apps
+
+Configmap MUST be refferenced in the cluster before refferencing it!
+Create ConfigMap first:
+kubectl apply -f mongo-configmap.yaml
+
+Then Mongo-express deployment: kubectl apply -f mongo-express.yaml
+
+To see server listening: kubectl logs mongo-express-78fcf796b8-w2vxm
+
+To connect to the mongo-express from the web, we need an external service:
+
+The Load balancer term is tricky...becuase it makes a Service technically external to
+applicaitons...but services still load balance INTERNALLY.
+Load Balancer value assigns an external IP address for applications
+
+kubectl apply -f mongo-express.yaml
+You should be able to see that Load blanacer with:
+kubectl get service
+When creating service, it's defaulted as 'internal' to the cluster
+External has an external IP address and an IP assigned to the port
+YOu should see the external IP as pending to begin with. To add it...
+minikube service mongo-express-service
+You can see it gave a sudo url to access this application from and
+a port. Example from our test: http://192.168.49.2:30000
+
+WIth the app open, click 'Create Database'. In practice, what happened was:
+Mongo Express External Service was contacted from application ==>
+That serive sent the request to the Mongo Express Pod ==>
+Mongo DB Internal Service was connected to from Express Pod ==>
+Finally, the MongoDB Internal Service forwarded that to the MongoDB Pod
+
+Part 7 Kubernetes NameSpace
+* Namespace - Organization for resources. A virtual Cluster inside Kubernetes
+Cluster. You get 4 namespaces by default.
+Kubectl get namespace. Types of Namespaces:
+- kubernetes-dashboard: only with minikube
+- kube-system: A system process...DON'T MODIFY!
+- kube-public: Publicly accessible data. Accessable without authentification
+- kube-node-lease: Contains info on 'heartbeats' of nodes. Determines
+availablitly of node
+- default: you create new namespace info here...if you haven't already created one
+
+To create namespace:
+kubectl create namespace NAME-OF-NameSpace
+you can also use a configuartion file for a Namespace
+
+Benefits for Namespace
+- Everything is in one space, under one name.
+For example, one namespace with a database, with all required resources. Then
+another for monitoring, elastic-stack, and application stuff.
+According to docs, you don't need to use it for a small project.
+- Good for big teams, same application
+- Resource sharing, for staging and development. ALso good for versioning production.
+- Access and resource limits on Namespaces. So one team only has access to one namespace,
+etc. You can also allocate CPU, Ram, Storage, etc for certain teams.
+
+Organization for Namespaces
+
+- You CAN'T access most resources from different Namespaces. For example,
+Project A Namespace can't access the configmap from Project Balancer
+In the actual YAMl configuration, you can access other resources from other 
+Namespaces with a .NAME_SPACE annotator
+
+- Some Components can't be created WITHIN a Namespace...like volumes or nodes.
+They live globally within a cluster. To list components NOT bound to a namespace:
+kubectl api-resources --namespaced=false
+kubectl api-resources --namespaced=true
+
+To create NameSpace: kubectl create namespace <namespace name>
+By default, if no Namepsace is given for a component, it defaults to 'default' Namespace
+Kubectl actually just substitutes the default namespace if no namespace is given.
+The commands actually look like:
+kubectl get configmap -n default // -n is namespace, default is default Namepsace
+To create a component in a Namespace:
+kubectl apply -f mysql-configmap.yaml --namespace=my-namespace
+BETTER WAY: Include it in a config file
+
+To make a namespace the default namespace:
+There's a tool called kubens you need to install:
