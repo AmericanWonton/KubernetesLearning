@@ -1,0 +1,52 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mongo-express
+  labels:
+    app: mongo-express
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mongo-express
+  template:
+    metadata:
+      labels:
+        app: mongo-express
+    spec:
+      containers:
+      - name: mongo-express
+        image: mongo-express
+        ports:
+        - containerPort: 8081 #You can find this port online for this container
+        env:
+        - name: ME_CONFIG_MONGODB_ADMINUSERNAME
+          valueFrom:
+            secretKeyRef:
+              name: mongodb-secret
+              key: mongo-root-username
+        - name: ME_CONFIG_MONGODB_ADMINPASSWORD
+          valueFrom: 
+            secretKeyRef:
+              name: mongodb-secret
+              key: mongo-root-password
+        - name: ME_CONFIG_MONGODB_SERVER
+          valueFrom: 
+            configMapKeyRef:
+              name: mongodb-configmap #Name of keyvalue, NOT file!
+              key: database_url
+---
+#This is an external service...see settings below
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongo-express-service
+spec:
+  selector:
+    app: mongo-express
+  type: LoadBalancer  #Kind of confusing, but this exposes it externally
+  ports:
+    - protocol: TCP
+      port: 8081 #Ports Exposed
+      targetPort: 8081 #Used for this service to connect to Mongo's container port
+      nodePort: 30000 #external port to access applications from. Range 30k to 32767

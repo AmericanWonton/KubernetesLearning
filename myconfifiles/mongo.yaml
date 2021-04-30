@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mongodb-deployment
+  labels:
+    app: mongodb #Label for service and other components to talk to
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mongodb #Label for service and other components to talk to
+  template:
+    metadata:
+      labels:
+        app: mongodb #Label for service and other components to talk to
+    spec:
+      containers:
+      - name: mongodb #container name
+        image: mongo #image we'll be running
+        ports:
+        - containerPort: 27017 #The port of this service and the container must match
+        env:
+        - name: MONGO_INITDB_ROOT_USERNAME
+          valueFrom: #USERNAME AND PASSWORD SHOULD NOT GO HERE...GET THIS FROM SECRET FILE!
+            secretKeyRef:
+              name: mongodb-secret
+              key: mongo-root-username
+        - name: MONGO_INITDB_ROOT_PASSWORD
+          valueFrom: #USERNAME AND PASSWORD SHOULD NOT GO HERE...GET THIS FROM SECRET FILE!
+            secretKeyRef:
+              key: mongo-root-password
+              name: mongodb-secret
+---
+#'kind' What compenent this is
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongodb-service #A name you designate
+spec:
+  selector:
+    app: mongodb #This connects to the pod through the 'label' you give it above.
+  ports:
+    - protocol: TCP
+      port: 27017 #The Port of this service...this CAN be different from the pod
+      targetPort: 27017 #The port of this service and the container must match
