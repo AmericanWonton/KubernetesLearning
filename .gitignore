@@ -1,2 +1,4 @@
 testfile2.txt
 kubernetesconfigfiles
+myclusterexample/go-docker-container/project/logging
+myclusterexample/go-docker-container/project/logging/logging.txt
