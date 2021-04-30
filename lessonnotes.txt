@@ -320,3 +320,173 @@ BETTER WAY: Include it in a config file
 
 To make a namespace the default namespace:
 There's a tool called kubens you need to install:
+Install Brew first, https://brew.sh/
+Then: brew install kubectx
+
+With Kubens, you can type:
+kubens my-namespace
+Now you can execute kubectl commands without providing the namespace
+
+Part 8 Ingress:
+
+Using a service to expose the app is okay for testing...but for a final product, 
+we want a domain name! https://my-app.com 
+In this case, we do NOT open our app through the IP address and the port service!
+The Ingress will instead take teh request from the site, and redirect THAT to the
+service. Then that service will redirect it to the pod.
+
+You need an implementation for Ingress...called an Ingress Controller.
+It's basically a set of pods that evaulates/processes Ingress rules.
+This will be the entrypoint to all request to the Cluster
+You have to see which 3rd party controller you like
+
+You must consider the envrionment you're running your cluster on.
+For the cloud, you don't need to implement a load balancer, which is nice.
+Through not the cloud, you can set up a 'proxy server' which has a public ip 
+address and open ports that sort requests as an entrypoint to the cluster.
+NO KUBERNETES CLUSTER SHOULD BE ACCESSIBLE EXTERNALLY
+
+To install ingress, (one way, with nGinx): minikube addons enable ingress
+
+Get Kubernete Dashboard: kubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/v2.0.0/aio/deploy/recommended.yaml
+
+We created an Ingress to access Kubernetes dashboard trhough the host.
+
+NOTE THIS SECTION GOT HARD TO FOLLOW ALONG; SOME STUFF DID NOT COME WITH OUT OF 
+THE BOX
+
+She went into /etc/hosts to forward teh host naming. Example:
+192.168.64.5	dashboard.com              (This works locally)
+
+Default backend is used to host the kubernetes board if you don't se this 
+all up
+
+You can make multiple paths for the same host, (example Google)
+In rules, you can define the host, then the paths for each service that
+goes to an app, for example
+
+Another good use is sub-domains, like shopping.myapp.com
+
+Configuring TLS Certificate:
+Just define TLS above the host, then the secret name,(see video for more)
+
+Data keys for this must be tls.crt and tls.key
+
+Part 9 Helm:
+
+* What is Helm? - Like a package manager,(brew) for Kubernetes. So instead of getting a bunch
+of yaml files for configuring one tool in Kubernetes, you bunch them together;
+this is called the 'Helm Chart', just a bundle of Yamls.
+For example, if you have a deployment you think you need in your cluster, 
+you can use helm search KEYWORD to find it. Or you can go to 
+Helm Hub.
+Helm is a 'Templating Engine'. Using helm you can define a common blueprint for deployment
+of Microservices; any values that are different can be changed by placeholders,
+in a 'Template' file. These values are definied in those template files.
+Helm is also good for deploying across different enviornments
+
+Structure:
+mychart/ --name of chart
+	chart.yaml -- meta info about chart, (dependencies, etc)
+	values.yaml --values for the templates files,(override default values)
+	charts/ -- chart dependencies,(does this chart depend on other charts?)
+	templates/ -- the actual template files; also, READMEFILE
+
+	...
+
+when chart is installed with helm install CHARTNAME, tempaltes files will
+be filled with the values from values.yaml
+
+Difference between Helm V2/V3
+
+Helm V2:
+Client(helm CLI) and Server,(Tiller)
+Client send commands to Tiller..tiller then executes requests and create components.
+It also creates a history of these executions...you can rollback these changes whenever
+Downside: There's a LOT of power with the tiller...kind of a security issue...
+
+Helm3:
+Removes Tiller because of security, it runs as a binary
+
+
+
+Part 10 Volumes:
+
+Volumes must be it's own seperate node; because if a node goes down, other nodes 
+need to be able to access it. Storage needs to survive even if the cluster crashed.
+
+Volumes might also be good for a directory storage.
+
+* Persistant Volume - Used for directory data storage. It's it's own cluster resource.
+It's created via a YAML file. This needs ACTUAL machine pysical storage. You need to
+create and manage these data storage sites yourself...Kubernetes is just a 'plug-in' to 
+this cluster. Depending on storage type, (local, cloud, etc), the configuration might 
+be a little different. THESE ARE ACCESSABLE TO THE WHOLE CLUSTER - NOT NAMESPACED
+
+* Persistant Volume Claim - Needs to be created when cluster starts...pods need to 
+access it! The applications deployed in pods must CLAIM the Persistant Volume, using a 
+PVC, (configured in YAML). It also needs to be used in the Pod's configuration
+
+* Storage Class
+
+Volume Types:
+
+Each has it's own use case 
+
+* Local Volume - Does not survive in cluster clash, and is tied to a specific node
+
+* Remote Volume - Is better/safer
+
+Volume extraction example:
+A Pod, requests volume through the PVC,(must be in same namespace!) ==>
+PVC tries to find a volume in the cluster with enough storage ==>
+Volume has the actual storage back-end
+
+Once all that is done, you can create the mount-space INSIDE the actual container 
+running in the pod. This is easier for devs because you just worry about 
+deploying the applications
+
+You can also mount secret/config maps INTO your containers on your pods, to give them key
+data info
+
+Honestly, I think I'll look back into this when I need it...
+
+Part 11 Stateful Set:
+
+* Stateful-set - Used for 'Stateful Applicaitons'. Example, oldDB that stores data 
+to keep track of it's state. Stateless applications don't keep record of state. 
+So, a simple node.js is stateless...but the mongodb application is stateful. Stateful apps
+are hard to maintain
+
+Stateless are deployed with Deployments and can be replicated. 
+Stateful Applications are deployed using 'Stateful-Set' deployments.
+Storage is configured the same way
+
+Stateful pods can't be created/deleted at same time/randomly addressed.
+They are NOT identical - they have their own identity.
+
+Might wanna watch this section later as well...
+She basically says, bruh, don't put your DBS in here...
+
+Part 12 Kubernetes Services explained
+Different services are used for different use cases.
+
+* Service - Used for a persistant IP Address for Pods. Also allows for load balancing, that way, clients can call for 
+a SINGLE IP address instead of the IP of each pod. Services are good for coupling in AND outside the Kluster.
+
+* ClusterIP Services - Default Service Type. Takes Cluster IP if you don't sepcify in the configuration. Cluster IP usually takes 
+the Request from the Ingress, (which gets it from the client first), then that service forwards the request INTERNALLY to 
+the pods. 
+
+Services can forward requests to pods through 'selectors'; in the configuration of the service, enter 
+the key value pair 'selector' towards the pods with their labels.
+
+If two applications are in a pod, the 'targetPort' attribute can be used to forward requests to each application.
+
+When you create a service, Kubernetes creates and 'end-point' object, which is the same name as the service and keeps track of which 
+pods/members are apart of the service: kubectl get endpoints
+
+If you want to create a 'mulitport' service, you need to name each port for services to connect to.
+
+* Headless Service - If Client wants to talk to a SPECIFIC pod, without being load balanced...might be used for stateful
+applications,(so no usecase for me.... :( )
